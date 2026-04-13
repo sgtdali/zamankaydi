@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, type TimesheetRow } from '@/lib/supabase'
 import ExcelModal from './ExcelModal'
 
@@ -107,6 +107,55 @@ export default function ZamanKaydiForm() {
   const [kayit, setKayit] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [hataMsg, setHataMsg] = useState('')
   const [excelModal, setExcelModal] = useState(false)
+  const [mevcutId, setMevcutId] = useState<string | null>(null)
+  const [sorgulanıyor, setSorgulanıyor] = useState(false)
+  const sorguRef = useRef<AbortController | null>(null)
+
+  // Çalışan + hafta kombinasyonu değişince mevcut kaydı sorgula
+  useEffect(() => {
+    if (!calisan_adi || !hafta_no) {
+      setMevcutId(null)
+      return
+    }
+
+    // Önceki sorguyu iptal et
+    sorguRef.current?.abort()
+    const ctrl = new AbortController()
+    sorguRef.current = ctrl
+
+    setSorgulanıyor(true)
+
+    supabase
+      .from('zamankay_timesheets')
+      .select('*, zamankay_timesheet_rows(*)')
+      .eq('calisan_adi', calisan_adi)
+      .eq('hafta_no', parseInt(hafta_no))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (ctrl.signal.aborted) return
+        if (data) {
+          setMevcutId(data.id)
+          setMasrafYeri(data.masraf_yeri ?? '')
+          setMasrafYeriKodu(data.masraf_yeri_kodu ?? '')
+          setTarih(data.tarih ? String(data.tarih).split('T')[0] : '')
+          // Mevcut satırları forma yükle
+          const dbRows: TimesheetRow[] = Array.from({ length: SATIR_SAYISI }, (_, i) => ({ ...BOŞ_SATIR(), sira_no: i + 1 }))
+          const sorted = [...(data.zamankay_timesheet_rows ?? [])].sort((a: TimesheetRow, b: TimesheetRow) => a.sira_no - b.sira_no)
+          sorted.forEach((r: TimesheetRow, i: number) => { if (i < SATIR_SAYISI) dbRows[i] = { ...r } })
+          setSatirlar(dbRows)
+        } else {
+          setMevcutId(null)
+          setMasrafYeri('')
+          setMasrafYeriKodu('')
+          setTarih('')
+          setSatirlar(Array.from({ length: SATIR_SAYISI }, (_, i) => ({ ...BOŞ_SATIR(), sira_no: i + 1 })))
+        }
+        setSorgulanıyor(false)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calisan_adi, hafta_no])
 
   const satirGuncelle = (idx: number, alan: keyof TimesheetRow, deger: string | number) => {
     setSatirlar(prev => prev.map((s, i) => i === idx ? { ...s, [alan]: deger } : s))
@@ -130,29 +179,51 @@ export default function ZamanKaydiForm() {
       GUN_KEYS.some(g => Number(s[g]) > 0) || s.notlar
     )
 
-    const { data: ts, error: tsErr } = await supabase
-      .from('zamankay_timesheets')
-      .insert({
-        calisan_adi: calisan_adi.trim(),
-        calisan_no: calisan_no.trim(),
-        masraf_yeri: masraf_yeri.trim(),
-        masraf_yeri_kodu: masraf_yeri_kodu.trim(),
-        hafta_no: hafta_no ? parseInt(hafta_no) : null,
-        tarih: tarih || null,
-      })
-      .select()
-      .single()
+    const headerPayload = {
+      calisan_adi: calisan_adi.trim(),
+      calisan_no: calisan_no.trim(),
+      masraf_yeri: masraf_yeri.trim(),
+      masraf_yeri_kodu: masraf_yeri_kodu.trim(),
+      hafta_no: hafta_no ? parseInt(hafta_no) : null,
+      tarih: tarih || null,
+      updated_at: new Date().toISOString(),
+    }
 
-    if (tsErr || !ts) {
-      setKayit('error')
-      setHataMsg('Kayıt oluşturulamadı: ' + (tsErr?.message || 'Bilinmeyen hata'))
-      return
+    let tsId: string
+
+    if (mevcutId) {
+      // Güncelle
+      const { error: upErr } = await supabase
+        .from('zamankay_timesheets')
+        .update(headerPayload)
+        .eq('id', mevcutId)
+      if (upErr) {
+        setKayit('error')
+        setHataMsg('Güncelleme hatası: ' + upErr.message)
+        return
+      }
+      // Eski satırları sil, yenilerini yaz
+      await supabase.from('zamankay_timesheet_rows').delete().eq('timesheet_id', mevcutId)
+      tsId = mevcutId
+    } else {
+      // Yeni kayıt
+      const { data: ts, error: tsErr } = await supabase
+        .from('zamankay_timesheets')
+        .insert(headerPayload)
+        .select()
+        .single()
+      if (tsErr || !ts) {
+        setKayit('error')
+        setHataMsg('Kayıt oluşturulamadı: ' + (tsErr?.message || 'Bilinmeyen hata'))
+        return
+      }
+      tsId = ts.id
     }
 
     if (doluSatirlar.length > 0) {
       const { error: rowErr } = await supabase
         .from('zamankay_timesheet_rows')
-        .insert(doluSatirlar.map((s, i) => ({ ...s, sira_no: i + 1, timesheet_id: ts.id })))
+        .insert(doluSatirlar.map((s, i) => ({ ...s, sira_no: i + 1, timesheet_id: tsId })))
 
       if (rowErr) {
         setKayit('error')
@@ -399,9 +470,16 @@ export default function ZamanKaydiForm() {
             Excel Çıktısı
           </button>
 
+          {sorgulanıyor && (
+            <span className="text-blue-500 text-sm">Kayıt sorgulanıyor...</span>
+          )}
+          {!sorgulanıyor && mevcutId && kayit === 'idle' && (
+            <span className="text-amber-600 text-sm font-medium">Mevcut kayıt yüklendi — üzerine yazılacak</span>
+          )}
+
           {kayit === 'success' && (
             <span className="text-green-600 font-semibold text-sm">
-              Kayıt başarıyla oluşturuldu!
+              {mevcutId ? 'Kayıt güncellendi!' : 'Kayıt oluşturuldu!'}
             </span>
           )}
           {(kayit === 'error' || hataMsg) && (
