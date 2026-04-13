@@ -244,16 +244,7 @@ export default function ZamanKaydiForm() {
     }
 
     setKayit('success')
-    setTimeout(() => {
-      setCalisanAdi('')
-      setCalisanNo('')
-      setMasrafYeri('')
-      setMasrafYeriKodu('')
-      setHaftaNo('')
-      setTarih('')
-      setSatirlar(Array.from({ length: SATIR_SAYISI }, (_, i) => ({ ...BOŞ_SATIR(), sira_no: i + 1 })))
-      setKayit('idle')
-    }, 2500)
+    setTimeout(() => setKayit('idle'), 3000)
   }
 
   return (
