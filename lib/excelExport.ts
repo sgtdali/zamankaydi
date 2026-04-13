@@ -229,6 +229,141 @@ async function buildWorkbook(ts: Row, rows: Row[]): Promise<ExcelJS.Buffer> {
   return wb.xlsx.writeBuffer()
 }
 
+// ─── Tüm personel listesi ─────────────────────────────────────────────────────
+
+const TUM_PERSONEL = [
+  'ABDULSAMEt ÖZTÜRK', 'ABDURRAHMAN ALDEMİR', 'ADEM SELİM', 'AHMET KESKİN',
+  'AHMET UYGUR', 'AYHAN ŞAHAN', 'AYKUT ARSLANALP', 'BARAN KORKMAZ',
+  'BARIŞ DURAN', 'BERK BABACAN', 'CABİR KOÇ', 'CENGİZ ÜSTÜN',
+  'CİHAT BIÇKI', 'ÇAĞRI CAN ÇOLAK', 'DOĞAN EROL', 'ERKAN KÜLAHLΙ',
+  'FATİH UZUNAL', 'FERHAT ÇOBAN', 'HALİL İBRAHİM DEMİREL', 'HALİT ÇELİK',
+  'İBRAHİM KARA', 'KADİR YÜKSELEN', 'KEMAL ÜSTÜN', 'MEHMET CAN AKAR',
+  'METEHAN ARGUT', 'MUHSİN UYSAL', 'MUSTAFA ŞAHİN', 'MUSTAFA YILDIZ',
+  'MÜCAHİT TOPTAŞ', 'OKAN CEYHAN', 'ONUR AKCI', 'ÖZGÜR KALAYCI',
+  'RESUL KEKLİK', 'SEDAT KARAKAYA', 'SERHAT FATİH KALYONCU', 'SUAT TUNÇ',
+  'ŞENEL ÇELİK', 'TANER ÇELİK', 'UĞUR BOZYURT', 'ULAŞ ÇELİK',
+  'VOLKAN MADEN', 'YASİN DURSUN', 'YİĞİT ALİ ÜNAL', 'ZAFER ÇAĞMAN',
+]
+
+// ─── Toplu özet Excel ─────────────────────────────────────────────────────────
+
+async function buildSummaryWorkbook(haftaNo: number, sheets: Row[]): Promise<ExcelJS.Buffer> {
+  // kişi adı → gün toplamları map'i
+  const dataMap: Record<string, Record<string, number>> = {}
+  for (const ts of sheets) {
+    const rows = (ts.zamankay_timesheet_rows ?? []) as Row[]
+    const gunToplam: Record<string, number> = {}
+    GUN_KEYS.forEach(g => {
+      gunToplam[g] = rows.reduce((acc, r) => acc + Number(r[g] ?? 0), 0)
+    })
+    dataMap[String(ts.calisan_adi)] = gunToplam
+  }
+
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'ZamanKaydi'
+  const ws = wb.addWorksheet('Özet')
+
+  // Sütun genişlikleri: Personel + 7 gün + Toplam
+  ws.columns = [
+    { width: 26 }, // Personel adı
+    ...GUNLER.map(() => ({ width: 12 })),
+    { width: 10 }, // Haftalık toplam
+  ]
+
+  // ── Başlık satırı ────────────────────────────────────────────────────────
+  ws.getRow(1).height = 22
+  const baslikStyle = { bold: true, bgColor: 'DBEAFE', hAlign: 'center' as const, vAlign: 'middle' as const }
+
+  const h0 = ws.getCell('A1'); h0.value = `Hafta ${haftaNo} — Personel Özeti`
+  applyStyle(h0, { ...baslikStyle, hAlign: 'left' })
+  ws.mergeCells(`A1:${String.fromCharCode(65 + 1 + GUNLER.length)}1`)
+
+  // ── Kolon başlıkları ─────────────────────────────────────────────────────
+  ws.getRow(2).height = 20
+  const c0 = ws.getCell('A2'); c0.value = 'Personel Adı'
+  applyStyle(c0, baslikStyle)
+
+  GUNLER.forEach((gun, i) => {
+    const c = ws.getCell(2, 2 + i); c.value = gun
+    applyStyle(c, baslikStyle)
+  })
+
+  const cToplam = ws.getCell(2, 2 + GUNLER.length); cToplam.value = 'Haftalık\nToplam'
+  applyStyle(cToplam, { ...baslikStyle, wrap: true })
+
+  // ── Personel satırları ───────────────────────────────────────────────────
+  TUM_PERSONEL.forEach((ad, idx) => {
+    const rowNum = 3 + idx
+    const exRow = ws.getRow(rowNum)
+    exRow.height = 17
+
+    const bgColor = idx % 2 === 1 ? 'F9FAFB' : undefined
+    const gunToplam = dataMap[ad]
+
+    // Personel adı
+    const nameCell = ws.getCell(rowNum, 1)
+    nameCell.value = ad
+    applyStyle(nameCell, { bgColor })
+
+    // Günler
+    let haftaToplam = 0
+    GUN_KEYS.forEach((g, gi) => {
+      const val = gunToplam ? (gunToplam[g] ?? 0) : 0
+      haftaToplam += val
+      const c = ws.getCell(rowNum, 2 + gi)
+      if (val > 0) {
+        c.value = val
+        c.numFmt = Number.isInteger(val) ? '0' : '0.##'
+        applyStyle(c, { hAlign: 'center', bgColor })
+      } else if (gunToplam) {
+        // Kayıt var ama o gün 0 → boş bırak
+        applyStyle(c, { hAlign: 'center', bgColor })
+      } else {
+        // Hiç kayıt yok → gri arka plan
+        applyStyle(c, { hAlign: 'center', bgColor: bgColor ?? 'F3F4F6' })
+      }
+    })
+
+    // Haftalık toplam
+    const totCell = ws.getCell(rowNum, 2 + GUNLER.length)
+    if (gunToplam && haftaToplam > 0) {
+      totCell.value = haftaToplam
+      totCell.numFmt = Number.isInteger(haftaToplam) ? '0' : '0.##'
+      applyStyle(totCell, { bold: true, hAlign: 'center', bgColor })
+    } else if (!gunToplam) {
+      totCell.value = 'Giriş Yok'
+      applyStyle(totCell, { hAlign: 'center', color: 'EF4444', bgColor: bgColor ?? 'F3F4F6' })
+    } else {
+      applyStyle(totCell, { hAlign: 'center', bgColor })
+    }
+  })
+
+  // ── Alt toplam satırı ────────────────────────────────────────────────────
+  const altRow = 3 + TUM_PERSONEL.length
+  ws.getRow(altRow).height = 20
+
+  const altLabel = ws.getCell(altRow, 1)
+  altLabel.value = 'GENEL TOPLAM'
+  applyStyle(altLabel, { bold: true, bgColor: 'DBEAFE', color: '1D4ED8' })
+
+  let genelToplam = 0
+  GUN_KEYS.forEach((g, gi) => {
+    const gunelT = Object.values(dataMap).reduce((acc, d) => acc + (d[g] ?? 0), 0)
+    genelToplam += gunelT
+    const c = ws.getCell(altRow, 2 + gi)
+    c.value = gunelT
+    c.numFmt = '0.00'
+    applyStyle(c, { bold: true, hAlign: 'center', bgColor: 'DBEAFE', color: '1D4ED8' })
+  })
+
+  const genelTotCell = ws.getCell(altRow, 2 + GUNLER.length)
+  genelTotCell.value = genelToplam
+  genelTotCell.numFmt = '0.00'
+  applyStyle(genelTotCell, { bold: true, hAlign: 'center', bgColor: 'DBEAFE', color: '1D4ED8' })
+
+  return wb.xlsx.writeBuffer()
+}
+
 // ─── Supabase fetch ───────────────────────────────────────────────────────────
 
 async function fetchTimesheetData(haftaNo: number, calisanAdi?: string) {
@@ -285,6 +420,10 @@ export async function exportAll(haftaNo: number) {
     const buf = await buildWorkbook(ts, rows)
     folder.file(`${safeName(String(ts.calisan_adi))}.xlsx`, buf as ArrayBuffer)
   }
+
+  // Toplu özet Excel
+  const summaryBuf = await buildSummaryWorkbook(haftaNo, sheets as Row[])
+  folder.file(`_OZET_Hafta${haftaNo}.xlsx`, summaryBuf as ArrayBuffer)
 
   const zipBlob = await zip.generateAsync({ type: 'blob' })
   const url = URL.createObjectURL(zipBlob)
