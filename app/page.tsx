@@ -79,6 +79,15 @@ const IS_TIPLERI: { label: string; kod: string }[] = [
 
 const KOD_MAP = Object.fromEntries(IS_TIPLERI.map(t => [t.label, t.kod]))
 
+function isoHaftaNo(tarihStr: string): number {
+  const d = new Date(tarihStr)
+  d.setHours(0, 0, 0, 0)
+  // ISO 8601: Perşembe'yi içeren haftanın haftası
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+  const yilBaslangic = new Date(d.getFullYear(), 0, 1)
+  return Math.ceil(((d.getTime() - yilBaslangic.getTime()) / 86400000 + 1) / 7)
+}
+
 const BOŞ_SATIR = (): TimesheetRow => ({
   sira_no: 0,
   is_tipi: '',
@@ -328,7 +337,11 @@ export default function ZamanKaydiForm() {
                 <input
                   type="date"
                   value={tarih}
-                  onChange={e => setTarih(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value
+                    setTarih(val)
+                    if (val) setHaftaNo(String(isoHaftaNo(val)))
+                  }}
                   className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
                 />
               </div>
