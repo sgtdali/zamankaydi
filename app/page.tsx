@@ -234,7 +234,11 @@ export default function ZamanKaydiForm() {
     if (doluSatirlar.length > 0) {
       const { error: rowErr } = await supabase
         .from('zamankay_timesheet_rows')
-        .insert(doluSatirlar.map((s, i) => ({ ...s, sira_no: i + 1, timesheet_id: tsId })))
+        .insert(doluSatirlar.map((s, i) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id: _id, timesheet_id: _tid, ...rest } = s
+          return { ...rest, sira_no: i + 1, timesheet_id: tsId }
+        }))
 
       if (rowErr) {
         setKayit('error')
