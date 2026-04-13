@@ -2,6 +2,56 @@
 
 import { useState } from 'react'
 import { supabase, type TimesheetRow } from '@/lib/supabase'
+import ExcelModal from './ExcelModal'
+
+const CALISANLAR: { ad: string; no: string }[] = [
+  { ad: 'ABDULSAMEt ÖZTÜRK',       no: '1571' },
+  { ad: 'ABDURRAHMAN ALDEMİR',      no: '487'  },
+  { ad: 'ADEM SELİM',               no: '7'    },
+  { ad: 'AHMET KESKİN',             no: '1236' },
+  { ad: 'AHMET UYGUR',              no: '378'  },
+  { ad: 'AYHAN ŞAHAN',              no: '35'   },
+  { ad: 'AYKUT ARSLANALP',          no: '20'   },
+  { ad: 'BARAN KORKMAZ',            no: '18'   },
+  { ad: 'BARIŞ DURAN',              no: '901'  },
+  { ad: 'BERK BABACAN',             no: '269'  },
+  { ad: 'CABİR KOÇ',               no: '1270' },
+  { ad: 'CENGİZ ÜSTÜN',            no: '32'   },
+  { ad: 'CİHAT BIÇKI',             no: '1222' },
+  { ad: 'ÇAĞRI CAN ÇOLAK',         no: '1335' },
+  { ad: 'DOĞAN EROL',              no: '891'  },
+  { ad: 'ERKAN KÜLAHLΙ',           no: '1549' },
+  { ad: 'FATİH UZUNAL',            no: '208'  },
+  { ad: 'FERHAT ÇOBAN',            no: '709'  },
+  { ad: 'HALİL İBRAHİM DEMİREL',   no: '57'   },
+  { ad: 'HALİT ÇELİK',             no: '949'  },
+  { ad: 'İBRAHİM KARA',            no: '1332' },
+  { ad: 'KADİR YÜKSELEN',          no: '884'  },
+  { ad: 'KEMAL ÜSTÜN',             no: '583'  },
+  { ad: 'MEHMET CAN AKAR',         no: '206'  },
+  { ad: 'METEHAN ARGUT',           no: '391'  },
+  { ad: 'MUHSİN UYSAL',            no: '1164' },
+  { ad: 'MUSTAFA ŞAHİN',           no: '982'  },
+  { ad: 'MUSTAFA YILDIZ',          no: '1191' },
+  { ad: 'MÜCAHİT TOPTAŞ',         no: '1567' },
+  { ad: 'OKAN CEYHAN',             no: '1590' },
+  { ad: 'ONUR AKCI',               no: '123'  },
+  { ad: 'ÖZGÜR KALAYCI',           no: '43'   },
+  { ad: 'RESUL KEKLİK',            no: '161'  },
+  { ad: 'SEDAT KARAKAYA',          no: '159'  },
+  { ad: 'SERHAT FATİH KALYONCU',   no: '249'  },
+  { ad: 'SUAT TUNÇ',               no: '788'  },
+  { ad: 'ŞENEL ÇELİK',            no: '825'  },
+  { ad: 'TANER ÇELİK',            no: '913'  },
+  { ad: 'UĞUR BOZYURT',            no: '207'  },
+  { ad: 'ULAŞ ÇELİK',             no: '1217' },
+  { ad: 'VOLKAN MADEN',            no: '158'  },
+  { ad: 'YASİN DURSUN',            no: '1220' },
+  { ad: 'YİĞİT ALİ ÜNAL',         no: '1147' },
+  { ad: 'ZAFER ÇAĞMAN',            no: '5'    },
+]
+
+const CALISAN_MAP = Object.fromEntries(CALISANLAR.map(c => [c.ad, c.no]))
 
 const GUNLER = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] as const
 const GUN_KEYS = ['pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'] as const
@@ -56,6 +106,7 @@ export default function ZamanKaydiForm() {
   )
   const [kayit, setKayit] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [hataMsg, setHataMsg] = useState('')
+  const [excelModal, setExcelModal] = useState(false)
 
   const satirGuncelle = (idx: number, alan: keyof TimesheetRow, deger: string | number) => {
     setSatirlar(prev => prev.map((s, i) => i === idx ? { ...s, [alan]: deger } : s))
@@ -140,20 +191,28 @@ export default function ZamanKaydiForm() {
             <div className="divide-y divide-gray-400">
               <div className="flex items-center px-3 py-2 gap-2">
                 <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan Adı:</label>
-                <input
-                  type="text"
+                <select
                   value={calisan_adi}
-                  onChange={e => setCalisanAdi(e.target.value)}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
-                />
+                  onChange={e => {
+                    const val = e.target.value
+                    setCalisanAdi(val)
+                    setCalisanNo(CALISAN_MAP[val] ?? '')
+                  }}
+                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
+                >
+                  <option value="" />
+                  {CALISANLAR.map(c => (
+                    <option key={c.ad} value={c.ad}>{c.ad}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center px-3 py-2 gap-2">
                 <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan No:</label>
                 <input
                   type="text"
                   value={calisan_no}
-                  onChange={e => setCalisanNo(e.target.value)}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
+                  readOnly
+                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-gray-600"
                 />
               </div>
             </div>
@@ -332,6 +391,14 @@ export default function ZamanKaydiForm() {
             Temizle
           </button>
 
+          <button
+            type="button"
+            onClick={() => setExcelModal(true)}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-2 rounded transition-colors text-sm"
+          >
+            Excel Çıktısı
+          </button>
+
           {kayit === 'success' && (
             <span className="text-green-600 font-semibold text-sm">
               Kayıt başarıyla oluşturuldu!
@@ -344,6 +411,8 @@ export default function ZamanKaydiForm() {
           )}
         </div>
       </form>
+
+      {excelModal && <ExcelModal onClose={() => setExcelModal(false)} />}
     </div>
   )
 }
