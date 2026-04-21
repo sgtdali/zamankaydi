@@ -5,6 +5,7 @@ import { supabase } from './supabase'
 const GUNLER = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
 const GUN_KEYS = ['pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'] as const
 const SATIR_SAYISI = 10
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -364,6 +365,149 @@ async function buildSummaryWorkbook(haftaNo: number, sheets: Row[]): Promise<Exc
   return wb.xlsx.writeBuffer()
 }
 
+function getYearFromTimesheet(ts: Row) {
+  const rawDate = String(ts.tarih ?? ts.created_at ?? '')
+  const yearText = rawDate.slice(0, 4)
+  const year = Number(yearText)
+  return Number.isFinite(year) && year > 1900 ? year : new Date().getFullYear()
+}
+
+function getIsoWeekDate(year: number, weekNo: number, dayIndex: number) {
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Day = jan4.getUTCDay() || 7
+  const firstMonday = jan4.getTime() - (jan4Day - 1) * ONE_DAY_MS
+  return new Date(firstMonday + ((weekNo - 1) * 7 + dayIndex) * ONE_DAY_MS)
+}
+
+function formatReportDate(date: Date) {
+  return `${date.getUTCDate()}.${date.getUTCMonth() + 1}.${date.getUTCFullYear()}`
+}
+
+function getLatestSheetsByPersonWeekYear(sheets: Row[]) {
+  const latest = new Map<string, Row>()
+
+  for (const sheet of sheets) {
+    const person = String(sheet.calisan_adi ?? '').trim()
+    const weekNo = Number(sheet.hafta_no ?? 0)
+    if (!person || !weekNo) continue
+
+    const key = `${person}|${getYearFromTimesheet(sheet)}|${weekNo}`
+    const current = latest.get(key)
+    const currentCreatedAt = current ? new Date(String(current.created_at ?? '')).getTime() : 0
+    const sheetCreatedAt = new Date(String(sheet.created_at ?? '')).getTime()
+
+    if (!current || sheetCreatedAt >= currentCreatedAt) {
+      latest.set(key, sheet)
+    }
+  }
+
+  return Array.from(latest.values())
+}
+
+async function buildDetailedAllDataWorkbook(sheets: Row[]): Promise<ExcelJS.Buffer> {
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'ZamanKaydi'
+  const ws = wb.addWorksheet('Tum Veri')
+
+  ws.columns = [
+    { width: 24 }, // KISI
+    { width: 10 }, // SICIL NO
+    { width: 8 },  // HAFTA
+    { width: 12 }, // TARIH
+    { width: 16 }, // DEPARTMAN
+    { width: 15 }, // MAKINA KODU
+    { width: 10 }, // IS KODU
+    { width: 16 }, // IS TIPI
+    { width: 12 }, // SURE
+    { width: 18 }, // NOTLAR
+    { width: 24 }, // ACIKLAMA
+  ]
+
+  const headers = ['KİŞİ', 'SİCİL NO', 'HAFTA', 'TARİH', 'DEPARTMAN', 'MAKİNA KODU', 'İŞ KODU', 'İŞ TİPİ', 'SÜRE (SAAT)', 'NOTLAR', 'AÇIKLAMA']
+  const headerRow = ws.getRow(1)
+  headerRow.height = 20
+  headers.forEach((header, idx) => {
+    const cell = ws.getCell(1, idx + 1)
+    cell.value = header
+    applyStyle(cell, { bold: true, bgColor: 'FACC15', hAlign: 'center', vAlign: 'middle' })
+  })
+
+  const detailRows: Row[] = []
+  for (const ts of sheets) {
+    const rows = (ts.zamankay_timesheet_rows ?? []) as Row[]
+    const weekNo = Number(ts.hafta_no ?? 0)
+    if (!weekNo) continue
+
+    const year = getYearFromTimesheet(ts)
+    for (const row of rows) {
+      GUN_KEYS.forEach((gun, dayIndex) => {
+        const sure = Number(row[gun] ?? 0)
+        if (sure <= 0) return
+
+        const date = getIsoWeekDate(year, weekNo, dayIndex)
+        detailRows.push({
+          kisi: String(ts.calisan_adi ?? ''),
+          sicilNo: String(ts.calisan_no ?? ''),
+          hafta: weekNo,
+          tarih: formatReportDate(date),
+          tarihSort: date.getTime(),
+          departman: String(ts.masraf_yeri ?? ''),
+          makineKodu: String(row.makine_kodu ?? ''),
+          isKodu: String(row.kod ?? ''),
+          isTipi: String(row.is_tipi ?? ''),
+          sure,
+          notlar: String(row.notlar ?? ''),
+          aciklama: '',
+        })
+      })
+    }
+  }
+
+  detailRows.sort((a, b) =>
+    Number(a.tarihSort) - Number(b.tarihSort) ||
+    String(a.kisi).localeCompare(String(b.kisi), 'tr') ||
+    String(a.makineKodu).localeCompare(String(b.makineKodu), 'tr')
+  )
+
+  detailRows.forEach((row, idx) => {
+    const rowNum = idx + 2
+    const bgColor = idx % 2 === 1 ? 'F9FAFB' : undefined
+    const values = [
+      row.kisi,
+      row.sicilNo,
+      row.hafta,
+      row.tarih,
+      row.departman,
+      row.makineKodu,
+      row.isKodu,
+      row.isTipi,
+      row.sure,
+      row.notlar,
+      row.aciklama,
+    ]
+
+    values.forEach((value, colIdx) => {
+      const cell = ws.getCell(rowNum, colIdx + 1)
+      cell.value = value
+      if (colIdx === 8 && typeof value === 'number') {
+        cell.numFmt = Number.isInteger(value) ? '0' : '0.##'
+      }
+      applyStyle(cell, {
+        bgColor,
+        hAlign: [1, 2, 8].includes(colIdx) ? 'center' : 'left',
+      })
+    })
+  })
+
+  ws.autoFilter = {
+    from: 'A1',
+    to: 'K1',
+  }
+  ws.views = [{ state: 'frozen', ySplit: 1 }]
+
+  return wb.xlsx.writeBuffer()
+}
+
 // ─── Supabase fetch ───────────────────────────────────────────────────────────
 
 async function fetchTimesheetData(haftaNo: number, calisanAdi?: string) {
@@ -378,6 +522,28 @@ async function fetchTimesheetData(haftaNo: number, calisanAdi?: string) {
   const { data, error } = await q
   if (error) throw new Error(error.message)
   return data ?? []
+}
+
+async function fetchAllTimesheetData() {
+  const pageSize = 1000
+  let from = 0
+  const allRows: Row[] = []
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('zamankay_timesheets')
+      .select('*, zamankay_timesheet_rows(*)')
+      .order('tarih', { ascending: true })
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1)
+
+    if (error) throw new Error(error.message)
+    allRows.push(...((data ?? []) as Row[]))
+    if (!data || data.length < pageSize) break
+    from += pageSize
+  }
+
+  return allRows
 }
 
 function safeName(name: string) {
@@ -432,4 +598,12 @@ export async function exportAll(haftaNo: number) {
   a.download = `ZamanKaydi_Hafta${haftaNo}_TumPersonel.zip`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export async function exportDetailedAllData() {
+  const sheets = await fetchAllTimesheetData()
+  if (!sheets.length) throw new Error('Dışa aktarılacak kayıt bulunamadı.')
+
+  const buf = await buildDetailedAllDataWorkbook(getLatestSheetsByPersonWeekYear(sheets as Row[]))
+  downloadBuffer(buf, 'ZamanKaydi_TumVeri_Detayli.xlsx')
 }

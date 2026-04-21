@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase, type TimesheetRow } from '@/lib/supabase'
+import { exportDetailedAllData } from '@/lib/excelExport'
 import ExcelModal from './ExcelModal'
 
 const CALISANLAR: { ad: string; no: string }[] = [
@@ -105,6 +106,20 @@ const BOŞ_SATIR = (): TimesheetRow => ({
 
 const SATIR_SAYISI = 10
 
+async function mevcutKaydiBul(calisanAdi: string, haftaNo: number) {
+  const { data, error } = await supabase
+    .from('zamankay_timesheets')
+    .select('id')
+    .eq('calisan_adi', calisanAdi)
+    .eq('hafta_no', haftaNo)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.id ? String(data.id) : null
+}
+
 export default function ZamanKaydiForm() {
   const [calisan_adi, setCalisanAdi] = useState('')
   const [calisan_no, setCalisanNo] = useState('')
@@ -118,6 +133,7 @@ export default function ZamanKaydiForm() {
   const [kayit, setKayit] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [hataMsg, setHataMsg] = useState('')
   const [excelModal, setExcelModal] = useState(false)
+  const [detayExcelDurum, setDetayExcelDurum] = useState<'idle' | 'loading'>('idle')
   const [mevcutId, setMevcutId] = useState<string | null>(null)
   const [sorgulanıyor, setSorgulanıyor] = useState(false)
   const sorguRef = useRef<AbortController | null>(null)
@@ -150,7 +166,7 @@ export default function ZamanKaydiForm() {
           setMevcutId(data.id)
           setMasrafYeri(data.masraf_yeri ?? '')
           setMasrafYeriKodu(data.masraf_yeri_kodu ?? '')
-          setTarih(data.tarih ? String(data.tarih).split('T')[0] : '')
+          setTarih(prev => data.tarih ? String(data.tarih).split('T')[0] : prev)
           // Mevcut satırları forma yükle
           const dbRows: TimesheetRow[] = Array.from({ length: SATIR_SAYISI }, (_, i) => ({ ...BOŞ_SATIR(), sira_no: i + 1 }))
           const sorted = [...(data.zamankay_timesheet_rows ?? [])].sort((a: TimesheetRow, b: TimesheetRow) => a.sira_no - b.sira_no)
@@ -160,7 +176,6 @@ export default function ZamanKaydiForm() {
           setMevcutId(null)
           setMasrafYeri('')
           setMasrafYeriKodu('')
-          setTarih('')
           setSatirlar(Array.from({ length: SATIR_SAYISI }, (_, i) => ({ ...BOŞ_SATIR(), sira_no: i + 1 })))
         }
         setSorgulanıyor(false)
@@ -181,6 +196,14 @@ export default function ZamanKaydiForm() {
       setHataMsg('Çalışan adı zorunludur.')
       return
     }
+    if (!hafta_no || Number(hafta_no) < 1 || Number(hafta_no) > 53) {
+      setHataMsg('Hafta no zorunludur.')
+      return
+    }
+    if (!tarih) {
+      setHataMsg('Tarih zorunludur.')
+      return
+    }
 
     setKayit('loading')
     setHataMsg('')
@@ -195,27 +218,39 @@ export default function ZamanKaydiForm() {
       calisan_no: calisan_no.trim(),
       masraf_yeri: masraf_yeri.trim(),
       masraf_yeri_kodu: masraf_yeri_kodu.trim(),
-      hafta_no: hafta_no ? parseInt(hafta_no) : null,
-      tarih: tarih || null,
+      hafta_no: parseInt(hafta_no),
+      tarih,
       updated_at: new Date().toISOString(),
     }
 
-    let tsId: string
+    let tsId = mevcutId
 
-    if (mevcutId) {
+    try {
+      tsId = await mevcutKaydiBul(headerPayload.calisan_adi, headerPayload.hafta_no)
+    } catch (e: unknown) {
+      setKayit('error')
+      setHataMsg('Mevcut kayıt kontrol edilemedi: ' + (e instanceof Error ? e.message : 'Bilinmeyen hata'))
+      return
+    }
+
+    if (tsId) {
       // Güncelle
       const { error: upErr } = await supabase
         .from('zamankay_timesheets')
         .update(headerPayload)
-        .eq('id', mevcutId)
+        .eq('id', tsId)
       if (upErr) {
         setKayit('error')
         setHataMsg('Güncelleme hatası: ' + upErr.message)
         return
       }
       // Eski satırları sil, yenilerini yaz
-      await supabase.from('zamankay_timesheet_rows').delete().eq('timesheet_id', mevcutId)
-      tsId = mevcutId
+      const { error: delErr } = await supabase.from('zamankay_timesheet_rows').delete().eq('timesheet_id', tsId)
+      if (delErr) {
+        setKayit('error')
+        setHataMsg('Eski satırlar silinemedi: ' + delErr.message)
+        return
+      }
     } else {
       // Yeni kayıt
       const { data: ts, error: tsErr } = await supabase
@@ -230,6 +265,7 @@ export default function ZamanKaydiForm() {
       }
       tsId = ts.id
     }
+    setMevcutId(tsId)
 
     if (doluSatirlar.length > 0) {
       const { error: rowErr } = await supabase
@@ -249,6 +285,18 @@ export default function ZamanKaydiForm() {
 
     setKayit('success')
     setTimeout(() => setKayit('idle'), 3000)
+  }
+
+  const handleDetayExcel = async () => {
+    setDetayExcelDurum('loading')
+    setHataMsg('')
+    try {
+      await exportDetailedAllData()
+    } catch (e: unknown) {
+      setHataMsg(e instanceof Error ? e.message : 'Detaylı Excel çıktısı alınamadı.')
+    } finally {
+      setDetayExcelDurum('idle')
+    }
   }
 
   return (
@@ -322,6 +370,7 @@ export default function ZamanKaydiForm() {
                   type="number"
                   min={1}
                   max={53}
+                  required
                   value={hafta_no}
                   onChange={e => setHaftaNo(e.target.value)}
                   className="w-16 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-blue-600 font-semibold text-center"
@@ -331,6 +380,7 @@ export default function ZamanKaydiForm() {
                 <label className="text-sm font-semibold whitespace-nowrap w-24">Tarih:</label>
                 <input
                   type="date"
+                  required
                   value={tarih}
                   onChange={e => {
                     const val = e.target.value
@@ -478,6 +528,15 @@ export default function ZamanKaydiForm() {
             className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-2 rounded transition-colors text-sm"
           >
             Excel Çıktısı
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDetayExcel}
+            disabled={detayExcelDurum === 'loading'}
+            className="bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-semibold px-8 py-2 rounded transition-colors text-sm"
+          >
+            {detayExcelDurum === 'loading' ? 'Tüm veri hazırlanıyor...' : 'Tüm Veri Excel'}
           </button>
 
           {sorgulanıyor && (
