@@ -8,28 +8,28 @@ import ExcelModal from './ExcelModal'
 
 // Çalışan listesi artık Supabase'den çekiliyor.
 // Tip tanımlaması lib/supabase.ts içinde Employee olarak yapıldı.
-import type { Employee } from '@/lib/supabase'
+import type { Employee, ProjectLocation } from '@/lib/supabase'
 
 const GUNLER = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] as const
 const GUN_KEYS = ['pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'] as const
 
 const IS_TIPLERI: { label: string; kod: string }[] = [
-  { label: 'Montaj',           kod: 'MM' },
-  { label: 'Kurulum',          kod: 'KU' },
-  { label: 'Sevkiyat',         kod: 'SE' },
-  { label: 'Rework',           kod: 'RE' },
-  { label: 'Eğitim',           kod: 'EG' },
-  { label: 'Yalın Yönetim',    kod: 'YG' },
-  { label: 'Kalite Güvence',   kod: 'KG' },
-  { label: 'İş Bekleme',       kod: 'IB' },
-  { label: 'Parça Bekleme',    kod: 'PB' },
-  { label: 'Proses',           kod: 'PR' },
-  { label: 'Devreye Alma',     kod: 'DA' },
-  { label: 'Destek Proses',    kod: 'DP' },
-  { label: 'Destek Montaj',    kod: 'DM' },
+  { label: 'Montaj', kod: 'MM' },
+  { label: 'Kurulum', kod: 'KU' },
+  { label: 'Sevkiyat', kod: 'SE' },
+  { label: 'Rework', kod: 'RE' },
+  { label: 'Eğitim', kod: 'EG' },
+  { label: 'Yalın Yönetim', kod: 'YG' },
+  { label: 'Kalite Güvence', kod: 'KG' },
+  { label: 'İş Bekleme', kod: 'IB' },
+  { label: 'Parça Bekleme', kod: 'PB' },
+  { label: 'Proses', kod: 'PR' },
+  { label: 'Devreye Alma', kod: 'DA' },
+  { label: 'Destek Proses', kod: 'DP' },
+  { label: 'Destek Montaj', kod: 'DM' },
   { label: 'Destek Devreye Alma', kod: 'DD' },
-  { label: 'Servis/Bakım',     kod: 'SV' },
-  { label: 'Raporlama',        kod: 'RP' },
+  { label: 'Servis/Bakım', kod: 'SV' },
+  { label: 'Raporlama', kod: 'RP' },
 ]
 
 const KOD_MAP = Object.fromEntries(IS_TIPLERI.map(t => [t.label, t.kod]))
@@ -90,7 +90,7 @@ export default function ZamanKaydiForm() {
   const [mevcutId, setMevcutId] = useState<string | null>(null)
   const [sorgulanıyor, setSorgulanıyor] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
+  const [locations, setLocations] = useState<ProjectLocation[]>([])
   const sorguRef = useRef<AbortController | null>(null)
 
   // Sayfa açıldığında verileri çek
@@ -100,7 +100,7 @@ export default function ZamanKaydiForm() {
       .then(({ data, error }) => {
         if (!error && data) setEmployees(data)
       })
-    
+
     // Lokasyonlar
     supabase.from('zamankay_locations').select('*').order('ad', { ascending: true })
       .then(({ data, error }) => {
@@ -150,7 +150,7 @@ export default function ZamanKaydiForm() {
         }
         setSorgulanıyor(false)
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calisan_adi, hafta_no])
 
   const satirGuncelle = (idx: number, alan: keyof TimesheetRow, deger: string | number) => {

@@ -42,7 +42,7 @@ export type Employee = {
   created_at?: string
 }
 
-export type Location = {
+export type ProjectLocation = {
   id?: string
   ad: string
   created_at?: string

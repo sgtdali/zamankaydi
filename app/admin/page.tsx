@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase, type Employee, type Location } from "@/lib/supabase";
+import { supabase, type Employee, type ProjectLocation } from "@/lib/supabase";
 import { exportDetailedAllData } from "@/lib/excelExport";
 
 export default function AdminPage() {
@@ -14,7 +14,7 @@ export default function AdminPage() {
   const [newEmpName, setNewEmpName] = useState("");
   const [newEmpNo, setNewEmpNo] = useState("");
   
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [locations, setLocations] = useState<ProjectLocation[]>([]);
   const [newLocName, setNewLocName] = useState("");
 
   const [loading, setLoading] = useState(false);
