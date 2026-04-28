@@ -273,84 +273,73 @@ export default function ZamanKaydiForm() {
         </div>
 
         {/* Header Bilgileri */}
-        <div className="border border-gray-400 bg-white mb-0">
-          <div className="grid grid-cols-3 divide-x divide-gray-400">
-            {/* Sol */}
-            <div className="divide-y divide-gray-400">
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan Adı:</label>
-                <select
-                  value={calisan_adi}
-                  onChange={e => {
-                    const val = e.target.value
-                    setCalisanAdi(val)
-                    const emp = employees.find(c => c.ad === val)
-                    setCalisanNo(emp?.no ?? '')
-                  }}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
-                >
-                  <option value="" />
-                  {employees.map(c => (
-                    <option key={c.ad} value={c.ad}>{c.ad}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan No:</label>
-                <input
-                  type="text"
-                  value={calisan_no}
-                  readOnly
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-gray-600"
-                />
-              </div>
-            </div>
-            {/* Orta */}
-            <div className="divide-y divide-gray-400">
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-36">Lokasyon:</label>
-                <select
-                  value={masraf_yeri}
-                  required
-                  onChange={e => setMasrafYeri(e.target.value)}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
-                >
-                  <option value="" />
-                  {locations.map(loc => (
-                    <option key={loc.id} value={loc.ad}>{loc.ad}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {/* Sağ */}
-            <div className="divide-y divide-gray-400">
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-24">Hafta No:</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={53}
-                  required
-                  value={hafta_no}
-                  onChange={e => setHaftaNo(e.target.value)}
-                  className="w-16 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-blue-600 font-semibold text-center"
-                />
-              </div>
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-24">Tarih:</label>
-                <input
-                  type="date"
-                  required
-                  value={tarih}
-                  onChange={e => {
-                    const val = e.target.value
-                    setTarih(val)
-                    if (val) setHaftaNo(String(isoHaftaNo(val)))
-                  }}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
-                />
-              </div>
-            </div>
+        <div className="border border-gray-400 bg-white mb-0 divide-y divide-gray-400">
+          <div className="flex items-center px-3 py-2 gap-2">
+            <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan Adı:</label>
+            <select
+              value={calisan_adi}
+              onChange={e => {
+                const val = e.target.value
+                setCalisanAdi(val)
+                const emp = employees.find(c => c.ad === val)
+                setCalisanNo(emp?.no ?? '')
+              }}
+              className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
+            >
+              <option value="" />
+              {employees.map(c => (
+                <option key={c.ad} value={c.ad}>{c.ad}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center px-3 py-2 gap-2">
+            <label className="text-sm font-semibold whitespace-nowrap w-36">Çalışan No:</label>
+            <input
+              type="text"
+              value={calisan_no}
+              readOnly
+              className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-gray-600"
+            />
+          </div>
+          <div className="flex items-center px-3 py-2 gap-2">
+            <label className="text-sm font-semibold whitespace-nowrap w-36">Lokasyon:</label>
+            <select
+              value={masraf_yeri}
+              required
+              onChange={e => setMasrafYeri(e.target.value)}
+              className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
+            >
+              <option value="" />
+              {locations.map(loc => (
+                <option key={loc.id} value={loc.ad}>{loc.ad}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center px-3 py-2 gap-2">
+            <label className="text-sm font-semibold whitespace-nowrap w-36">Hafta No:</label>
+            <input
+              type="number"
+              min={1}
+              max={53}
+              required
+              value={hafta_no}
+              onChange={e => setHaftaNo(e.target.value)}
+              className="w-20 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent text-blue-600 font-semibold text-center"
+            />
+          </div>
+          <div className="flex items-center px-3 py-2 gap-2">
+            <label className="text-sm font-semibold whitespace-nowrap w-36">Tarih:</label>
+            <input
+              type="date"
+              required
+              value={tarih}
+              onChange={e => {
+                const val = e.target.value
+                setTarih(val)
+                if (val) setHaftaNo(String(isoHaftaNo(val)))
+              }}
+              className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
+            />
           </div>
         </div>
 
