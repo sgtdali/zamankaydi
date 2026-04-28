@@ -179,6 +179,16 @@ export default function ZamanKaydiForm() {
       return
     }
 
+    // Satır doğrulaması: Süre girilmişse İş Tipi zorunlu
+    for (let i = 0; i < satirlar.length; i++) {
+      const row = satirlar[i]
+      const hasHours = GUN_KEYS.some(key => Number(row[key] || 0) > 0)
+      if (hasHours && !row.is_tipi) {
+        setHataMsg(`${i + 1}. satırda çalışma süresi girilmiş ancak "İş Tipi" seçilmemiş.`)
+        return
+      }
+    }
+
     setKayit('loading')
     setHataMsg('')
 
@@ -378,6 +388,7 @@ export default function ZamanKaydiForm() {
                   <td className="border border-gray-300 p-0">
                     <select
                       value={satir.is_tipi}
+                      required={GUN_KEYS.some(gun => Number(satir[gun] || 0) > 0)}
                       onChange={e => {
                         const val = e.target.value
                         setSatirlar(prev => prev.map((s, i) =>
