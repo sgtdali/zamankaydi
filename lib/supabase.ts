@@ -34,3 +34,16 @@ export type TimesheetRow = {
   pazar: number
   notlar: string
 }
+
+export type Employee = {
+  id?: string
+  ad: string
+  no: string
+  created_at?: string
+}
+
+export type Location = {
+  id?: string
+  ad: string
+  created_at?: string
+}

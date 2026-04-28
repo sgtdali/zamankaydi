@@ -4,57 +4,11 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase, type TimesheetRow } from '@/lib/supabase'
-import { exportDetailedAllData } from '@/lib/excelExport'
 import ExcelModal from './ExcelModal'
 
-const CALISANLAR: { ad: string; no: string }[] = [
-  { ad: 'ABDULSAMEt ÖZTÜRK',       no: '1571' },
-  { ad: 'ABDURRAHMAN ALDEMİR',      no: '487'  },
-  { ad: 'ADEM SELİM',               no: '7'    },
-  { ad: 'AHMET KESKİN',             no: '1236' },
-  { ad: 'AHMET UYGUR',              no: '378'  },
-  { ad: 'AYHAN ŞAHAN',              no: '35'   },
-  { ad: 'AYKUT ARSLANALP',          no: '20'   },
-  { ad: 'BARAN KORKMAZ',            no: '18'   },
-  { ad: 'BARIŞ DURAN',              no: '901'  },
-  { ad: 'BERK BABACAN',             no: '269'  },
-  { ad: 'CABİR KOÇ',               no: '1270' },
-  { ad: 'CENGİZ ÜSTÜN',            no: '32'   },
-  { ad: 'CİHAT BIÇKI',             no: '1222' },
-  { ad: 'ÇAĞRI CAN ÇOLAK',         no: '1335' },
-  { ad: 'DOĞAN EROL',              no: '891'  },
-  { ad: 'ERKAN KÜLAHLΙ',           no: '1549' },
-  { ad: 'FATİH UZUNAL',            no: '208'  },
-  { ad: 'FERHAT ÇOBAN',            no: '709'  },
-  { ad: 'HALİL İBRAHİM DEMİREL',   no: '57'   },
-  { ad: 'HALİT ÇELİK',             no: '949'  },
-  { ad: 'İBRAHİM KARA',            no: '1332' },
-  { ad: 'KADİR YÜKSELEN',          no: '884'  },
-  { ad: 'KEMAL ÜSTÜN',             no: '583'  },
-  { ad: 'MEHMET CAN AKAR',         no: '206'  },
-  { ad: 'METEHAN ARGUT',           no: '391'  },
-  { ad: 'MUHSİN UYSAL',            no: '1164' },
-  { ad: 'MUSTAFA ŞAHİN',           no: '982'  },
-  { ad: 'MUSTAFA YILDIZ',          no: '1191' },
-  { ad: 'MÜCAHİT TOPTAŞ',         no: '1567' },
-  { ad: 'OKAN CEYHAN',             no: '1590' },
-  { ad: 'ONUR AKCI',               no: '123'  },
-  { ad: 'ÖZGÜR KALAYCI',           no: '43'   },
-  { ad: 'RESUL KEKLİK',            no: '161'  },
-  { ad: 'SEDAT KARAKAYA',          no: '159'  },
-  { ad: 'SERHAT FATİH KALYONCU',   no: '249'  },
-  { ad: 'SUAT TUNÇ',               no: '788'  },
-  { ad: 'ŞENEL ÇELİK',            no: '825'  },
-  { ad: 'TANER ÇELİK',            no: '913'  },
-  { ad: 'UĞUR BOZYURT',            no: '207'  },
-  { ad: 'ULAŞ ÇELİK',             no: '1217' },
-  { ad: 'VOLKAN MADEN',            no: '158'  },
-  { ad: 'YASİN DURSUN',            no: '1220' },
-  { ad: 'YİĞİT ALİ ÜNAL',         no: '1147' },
-  { ad: 'ZAFER ÇAĞMAN',            no: '5'    },
-]
-
-const CALISAN_MAP = Object.fromEntries(CALISANLAR.map(c => [c.ad, c.no]))
+// Çalışan listesi artık Supabase'den çekiliyor.
+// Tip tanımlaması lib/supabase.ts içinde Employee olarak yapıldı.
+import type { Employee } from '@/lib/supabase'
 
 const GUNLER = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] as const
 const GUN_KEYS = ['pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'] as const
@@ -133,10 +87,26 @@ export default function ZamanKaydiForm() {
   const [kayit, setKayit] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [hataMsg, setHataMsg] = useState('')
   const [excelModal, setExcelModal] = useState(false)
-  const [detayExcelDurum, setDetayExcelDurum] = useState<'idle' | 'loading'>('idle')
   const [mevcutId, setMevcutId] = useState<string | null>(null)
   const [sorgulanıyor, setSorgulanıyor] = useState(false)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const sorguRef = useRef<AbortController | null>(null)
+
+  // Sayfa açıldığında verileri çek
+  useEffect(() => {
+    // Çalışanlar
+    supabase.from('zamankay_employees').select('*').order('ad', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setEmployees(data)
+      })
+    
+    // Lokasyonlar
+    supabase.from('zamankay_locations').select('*').order('ad', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setLocations(data)
+      })
+  }, [])
 
   // Çalışan + hafta kombinasyonu değişince mevcut kaydı sorgula
   useEffect(() => {
@@ -194,6 +164,10 @@ export default function ZamanKaydiForm() {
     e.preventDefault()
     if (!calisan_adi.trim()) {
       setHataMsg('Çalışan adı zorunludur.')
+      return
+    }
+    if (!masraf_yeri.trim()) {
+      setHataMsg('Lokasyon seçimi zorunludur.')
       return
     }
     if (!hafta_no || Number(hafta_no) < 1 || Number(hafta_no) > 53) {
@@ -287,17 +261,6 @@ export default function ZamanKaydiForm() {
     setTimeout(() => setKayit('idle'), 3000)
   }
 
-  const handleDetayExcel = async () => {
-    setDetayExcelDurum('loading')
-    setHataMsg('')
-    try {
-      await exportDetailedAllData()
-    } catch (e: unknown) {
-      setHataMsg(e instanceof Error ? e.message : 'Detaylı Excel çıktısı alınamadı.')
-    } finally {
-      setDetayExcelDurum('idle')
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -321,12 +284,13 @@ export default function ZamanKaydiForm() {
                   onChange={e => {
                     const val = e.target.value
                     setCalisanAdi(val)
-                    setCalisanNo(CALISAN_MAP[val] ?? '')
+                    const emp = employees.find(c => c.ad === val)
+                    setCalisanNo(emp?.no ?? '')
                   }}
                   className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
                 >
                   <option value="" />
-                  {CALISANLAR.map(c => (
+                  {employees.map(c => (
                     <option key={c.ad} value={c.ad}>{c.ad}</option>
                   ))}
                 </select>
@@ -344,22 +308,18 @@ export default function ZamanKaydiForm() {
             {/* Orta */}
             <div className="divide-y divide-gray-400">
               <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-36">Masraf Yeri:</label>
-                <input
-                  type="text"
+                <label className="text-sm font-semibold whitespace-nowrap w-36">Lokasyon:</label>
+                <select
                   value={masraf_yeri}
+                  required
                   onChange={e => setMasrafYeri(e.target.value)}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
-                />
-              </div>
-              <div className="flex items-center px-3 py-2 gap-2">
-                <label className="text-sm font-semibold whitespace-nowrap w-36">Masraf Yeri Kodu:</label>
-                <input
-                  type="text"
-                  value={masraf_yeri_kodu}
-                  onChange={e => setMasrafYeriKodu(e.target.value)}
-                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent"
-                />
+                  className="flex-1 border-b border-gray-400 outline-none text-sm px-1 py-0.5 bg-transparent cursor-pointer"
+                >
+                  <option value="" />
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.ad}>{loc.ad}</option>
+                  ))}
+                </select>
               </div>
             </div>
             {/* Sağ */}
@@ -530,14 +490,6 @@ export default function ZamanKaydiForm() {
             Excel Çıktısı
           </button>
 
-          <button
-            type="button"
-            onClick={handleDetayExcel}
-            disabled={detayExcelDurum === 'loading'}
-            className="bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-semibold px-8 py-2 rounded transition-colors text-sm"
-          >
-            {detayExcelDurum === 'loading' ? 'Tüm veri hazırlanıyor...' : 'Tüm Veri Excel'}
-          </button>
 
           {sorgulanıyor && (
             <span className="text-blue-500 text-sm">Kayıt sorgulanıyor...</span>

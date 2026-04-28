@@ -15,10 +15,10 @@ type Row = Record<string, any>
 const THIN: ExcelJS.BorderStyle = 'thin'
 
 const BORDER_ALL: Partial<ExcelJS.Borders> = {
-  top:    { style: THIN },
+  top: { style: THIN },
   bottom: { style: THIN },
-  left:   { style: THIN },
-  right:  { style: THIN },
+  left: { style: THIN },
+  right: { style: THIN },
 }
 
 function applyStyle(
@@ -45,8 +45,8 @@ function applyStyle(
   }
   cell.alignment = {
     horizontal: opts.hAlign ?? 'left',
-    vertical:   opts.vAlign ?? 'middle',
-    wrapText:   opts.wrap ?? false,
+    vertical: opts.vAlign ?? 'middle',
+    wrapText: opts.wrap ?? false,
   }
   if (opts.bgColor) {
     cell.fill = {
@@ -71,15 +71,15 @@ async function buildWorkbook(ts: Row, rows: Row[]): Promise<ExcelJS.Buffer> {
   // Sütun genişlikleri (11 sütun)
   ws.columns = [
     { width: 20 }, // A  İş Tipi
-    { width: 6  }, // B  KOD
+    { width: 6 }, // B  KOD
     { width: 13 }, // C  Çalışılan Makine Kodu
     { width: 11 }, // D  Pazartesi
-    { width: 8  }, // E  Salı
+    { width: 8 }, // E  Salı
     { width: 10 }, // F  Çarşamba
     { width: 10 }, // G  Perşembe
-    { width: 8  }, // H  Cuma
+    { width: 8 }, // H  Cuma
     { width: 11 }, // I  Cumartesi
-    { width: 8  }, // J  Pazar
+    { width: 8 }, // J  Pazar
     { width: 22 }, // K  NOTLAR
   ]
 
@@ -147,11 +147,11 @@ async function buildWorkbook(ts: Row, rows: Row[]): Promise<ExcelJS.Buffer> {
 
   const thStyle = { bold: true, bgColor: 'DBEAFE', hAlign: 'center' as const, vAlign: 'middle' as const, wrap: true }
 
-  const a3 = ws.getCell('A3'); a3.value = 'İş Tipi';                    applyStyle(a3, thStyle)
-  const b3 = ws.getCell('B3'); b3.value = 'KOD';                        applyStyle(b3, thStyle)
-  const c3 = ws.getCell('C3'); c3.value = 'Çalışılan\nMakine Kodu';     applyStyle(c3, thStyle)
-  const d3 = ws.getCell('D3'); d3.value = 'Çalışılan Süre (saat)';      applyStyle(d3, thStyle)
-  const k3 = ws.getCell('K3'); k3.value = 'NOTLAR';                     applyStyle(k3, thStyle)
+  const a3 = ws.getCell('A3'); a3.value = 'İş Tipi'; applyStyle(a3, thStyle)
+  const b3 = ws.getCell('B3'); b3.value = 'KOD'; applyStyle(b3, thStyle)
+  const c3 = ws.getCell('C3'); c3.value = 'Çalışılan\nMakine Kodu'; applyStyle(c3, thStyle)
+  const d3 = ws.getCell('D3'); d3.value = 'Çalışılan Süre (saat)'; applyStyle(d3, thStyle)
+  const k3 = ws.getCell('K3'); k3.value = 'NOTLAR'; applyStyle(k3, thStyle)
 
   // ── Satır 4: Gün başlıkları ───────────────────────────────────────────────
   ws.getRow(4).height = 20
@@ -423,7 +423,7 @@ async function buildDetailedAllDataWorkbook(sheets: Row[]): Promise<ExcelJS.Buff
     { width: 24 }, // ACIKLAMA
   ]
 
-  const headers = ['KİŞİ', 'SİCİL NO', 'HAFTA', 'TARİH', 'DEPARTMAN', 'MAKİNA KODU', 'İŞ KODU', 'İŞ TİPİ', 'SÜRE (SAAT)', 'NOTLAR', 'AÇIKLAMA']
+  const headers = ['KİŞİ', 'SİCİL NO', 'HAFTA', 'TARİH', 'LOKASYON', 'MAKİNA KODU', 'İŞ KODU', 'İŞ TİPİ', 'SÜRE (SAAT)', 'NOTLAR', 'AÇIKLAMA']
   const headerRow = ws.getRow(1)
   headerRow.height = 20
   headers.forEach((header, idx) => {
