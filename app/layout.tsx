@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Zaman Kaydı",
   description: "Haftalık çalışma süresi giriş formu",
+  other: {
+    "color-scheme": "light",
+  },
 };
 
 export default function RootLayout({
